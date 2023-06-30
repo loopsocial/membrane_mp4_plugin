@@ -6,14 +6,16 @@ defmodule Membrane.MP4.Depayloader.AAC do
 
   alias Membrane.AAC
 
-  def_input_pad :input,
+  def_input_pad(:input,
     demand_unit: :buffers,
     demand_mode: :auto,
     accepted_format: Membrane.MP4.Payload
+  )
 
-  def_output_pad :output,
+  def_output_pad(:output,
     demand_mode: :auto,
     accepted_format: AAC
+  )
 
   @impl true
   def handle_init(_ctx, _opts) do
@@ -62,13 +64,21 @@ defmodule Membrane.MP4.Depayloader.AAC do
     depends_on_core_coder = 0
     extension_flag = 0
 
-    <<aot_id::5, _frequency_id::4, _channel_config_id::4, frame_length_id::1,
-      ^depends_on_core_coder::1, ^extension_flag::1>> = section_5
+    case section_5 do
+      <<aot_id::5, _frequency_id::4, _channel_config_id::4, frame_length_id::1,
+        ^depends_on_core_coder::1, ^extension_flag::1>> ->
+        %{
+          profile: AAC.aot_id_to_profile(aot_id),
+          samples_per_frame: AAC.frame_length_id_to_samples_per_frame(frame_length_id)
+        }
 
-    %{
-      profile: AAC.aot_id_to_profile(aot_id),
-      samples_per_frame: AAC.frame_length_id_to_samples_per_frame(frame_length_id)
-    }
+      <<aot_id::5, _frequency_id::4, _frequency::24, _channel_config_id::4, frame_length_id::1,
+        ^depends_on_core_coder::1, ^extension_flag::1>> ->
+        %{
+          profile: AAC.aot_id_to_profile(aot_id),
+          samples_per_frame: AAC.frame_length_id_to_samples_per_frame(frame_length_id)
+        }
+    end
   end
 
   defp unpack_esds_section(section, section_no) do
